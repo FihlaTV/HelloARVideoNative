@@ -20,6 +20,8 @@ extern "C" {
     JNIEXPORT void JNICALL JNIFUNCTION_NATIVE(nativeRotationChange(JNIEnv* env, jobject obj, jboolean portrait));
 };
 
+JavaVM *g_javaVM;
+
 namespace EasyAR {
 namespace samples {
 
@@ -119,6 +121,24 @@ void HelloARVideo::render()
                     video->openStreamingVideo("http://7xl1ve.com5.z0.glb.clouddn.com/sdkvideo/EasyARSDKShow201520.mp4", texid[2]);
                     video_renderer = renderer[2];
                 }
+                else if(frame.targets()[0].target().name() == std::string("playMp3_1")) {
+                    int status;
+                    JNIEnv *env = NULL;
+                    status = g_javaVM->GetEnv((void **) &env, JNI_VERSION_1_6);
+                    if (status < 0) {
+                        status = g_javaVM->AttachCurrentThread(&env, NULL);
+                        if (status < 0) {
+                            env = NULL;
+                        }
+                    }
+                    jclass clazz = env->FindClass("io/weichao/util/MediaUtil");
+//                    jmethodID c_id = env->GetMethodID(clazz,"<init>", "()V");
+//                    jobject obj = env->NewObject(clazz,c_id);
+//                    jmethodID m_id = env->GetMethodID(clazz,"playMp3_1", "()V");
+//                    env->CallVoidMethod(obj, m_id);
+                    jmethodID m_id = env->GetStaticMethodID(clazz,"playMp3_1", "()V");
+                    env->CallStaticVoidMethod(clazz, m_id);
+                }
             }
             if (video) {
                 video->onFound();
@@ -157,8 +177,9 @@ bool HelloARVideo::clear()
 }
 EasyAR::samples::HelloARVideo ar;
 
-JNIEXPORT jboolean JNICALL JNIFUNCTION_NATIVE(nativeInit(JNIEnv*, jobject))
+JNIEXPORT jboolean JNICALL JNIFUNCTION_NATIVE(nativeInit(JNIEnv* env, jobject))
 {
+    env->GetJavaVM(&g_javaVM);
     bool status = ar.initCamera();
     ar.loadAllFromJsonFile("targets.json");
     ar.loadFromImage("namecard.jpg");

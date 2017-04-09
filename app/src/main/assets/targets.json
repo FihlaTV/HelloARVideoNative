@@ -6,6 +6,10 @@
       "name" : "argame"
     },
     {
+      "image" : "playMp3_1.jpg",
+      "name" : "playMp3_1"
+    },
+    {
       "image" : "idback.jpg",
       "name" : "idback",
       "size" : [8.56, 5.4],
