@@ -1,23 +1,26 @@
 /**
-* Copyright (c) 2015-2016 VisionStar Information Technology (Shanghai) Co., Ltd. All Rights Reserved.
-* EasyAR is the registered trademark or trademark of VisionStar Information Technology (Shanghai) Co., Ltd in China
-* and other countries for the augmented reality technology developed by VisionStar Information Technology (Shanghai) Co., Ltd.
-*/
+ * Copyright (c) 2015-2016 VisionStar Information Technology (Shanghai) Co., Ltd. All Rights Reserved.
+ * EasyAR is the registered trademark or trademark of VisionStar Information Technology (Shanghai) Co., Ltd in China
+ * and other countries for the augmented reality technology developed by VisionStar Information Technology (Shanghai) Co., Ltd.
+ */
 
 package cn.easyar.samples.helloarvideo;
 
 import android.app.Activity;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 
 import cn.easyar.engine.EasyAR;
+import io.weichao.util.MediaUtil;
 
 
 public class MainActivity extends Activity {
+    private static final String TAG = "MainActivity";
 
     /*
     * Steps to create the key for this sample:
@@ -35,10 +38,15 @@ public class MainActivity extends Activity {
     }
 
     public static native void nativeInitGL();
+
     public static native void nativeResizeGL(int w, int h);
+
     public static native void nativeRender();
+
     private native boolean nativeInit();
+
     private native void nativeDestory();
+
     private native void nativeRotationChange(boolean portrait);
 
     @Override
@@ -69,6 +77,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
         nativeDestory();
     }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -96,5 +105,15 @@ public class MainActivity extends Activity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void playMP3_1() {
+        Log.i(TAG, "playMP3_1");
+        MediaUtil.playMp3_1(this);
+    }
+
+    public void stopMP3_1() {
+        Log.i(TAG, "stopMP3_1");
+        MediaUtil.stopMp3_1(this);
     }
 }

@@ -20,7 +20,25 @@ extern "C" {
     JNIEXPORT void JNICALL JNIFUNCTION_NATIVE(nativeRotationChange(JNIEnv* env, jobject obj, jboolean portrait));
 };
 
-JavaVM *g_javaVM;
+typedef struct context {
+    JavaVM *javaVM;
+    jclass mainActivityClz;
+    jobject mainActivityObj;
+    bool isPlaying;
+} Context;
+Context g_ctx;
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    JNIEnv *env;
+    memset(&g_ctx, 0, sizeof(g_ctx));
+
+    g_ctx.javaVM = vm;
+    if (vm->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK) {
+        return JNI_ERR;
+    }
+
+    return JNI_VERSION_1_6;
+}
 
 namespace EasyAR {
 namespace samples {
@@ -122,22 +140,47 @@ void HelloARVideo::render()
                     video_renderer = renderer[2];
                 }
                 else if(frame.targets()[0].target().name() == std::string("playMp3_1")) {
-                    int status;
-                    JNIEnv *env = NULL;
-                    status = g_javaVM->GetEnv((void **) &env, JNI_VERSION_1_6);
-                    if (status < 0) {
-                        status = g_javaVM->AttachCurrentThread(&env, NULL);
+                    // TODO 有时播放报错，应该是变量不同步，需要加锁。
+//                    04-28 19:59:36.527 5439-5439/cn.easyar.samples.helloarvideo W/MediaPlayer: mediaplayer went away with unhandled events
+//                    04-28 19:59:36.527 5439-5439/cn.easyar.samples.helloarvideo W/MediaPlayer: mediaplayer went away with unhandled events
+//                    04-28 19:59:36.528 5439-5718/cn.easyar.samples.helloarvideo E/Surface: getSlotFromBufferLocked: unknown buffer: 0xb851d910
+//
+//                    [ 04-28 19:59:36.537  3798: 5712 I/         ]
+//                    [CAMERA]ispv3_dynamic_fps_thread, cur_expo:0x77c, target_vts:0x12c2
+//
+//
+//                    [ 04-28 19:59:36.538  3798: 5712 I/         ]
+//                    [CAMERA]ispv3_fps_set_vts, flow:0, vts:0x12c2, fps:20
+//                    04-28 19:59:36.540 5439-5718/cn.easyar.samples.helloarvideo E/AndroidRuntime: FATAL EXCEPTION: GLThread 10412
+//                    Process: cn.easyar.samples.helloarvideo, PID: 5439
+//                    java.lang.RuntimeException: failure code: -38
+//                    at android.media.MediaPlayer.invoke(MediaPlayer.java:711)
+//                    at android.media.MediaPlayer.getInbandTrackInfo(MediaPlayer.java:2143)
+//                    at android.media.MediaPlayer.populateInbandTracks(MediaPlayer.java:2356)
+//                    at android.media.MediaPlayer.scanInternalSubtitleTracks(MediaPlayer.java:2348)
+//                    at android.media.MediaPlayer.prepare(MediaPlayer.java:1194)
+//                    at io.weichao.util.MediaUtil.playMp3_1(MediaUtil.java:52)
+//                    at cn.easyar.samples.helloarvideo.MainActivity.playMP3_1(MainActivity.java:112)
+//                    at cn.easyar.samples.helloarvideo.MainActivity.nativeRender(Native Method)
+//                    at cn.easyar.samples.helloarvideo.Renderer.onDrawFrame(Renderer.java:25)
+//                    at android.opengl.GLSurfaceView$GLThread.guardedRun(GLSurfaceView.java:1544)
+//                    at android.opengl.GLSurfaceView$GLThread.run(GLSurfaceView.java:1249)
+                    if (!g_ctx.isPlaying) {
+                        g_ctx.isPlaying = true;
+                        int status;
+                        JNIEnv *env = NULL;
+                        status = g_ctx.javaVM->GetEnv((void **) &env, JNI_VERSION_1_6);
                         if (status < 0) {
-                            env = NULL;
+                            status = g_ctx.javaVM->AttachCurrentThread(&env, NULL);
+                            if (status < 0) {
+                                env = NULL;
+                            }
                         }
+                        jclass clazz = g_ctx.mainActivityClz;
+                        jobject obj = g_ctx.mainActivityObj;
+                        jmethodID m_id = env->GetMethodID(clazz, "playMP3_1", "()V");
+                        env->CallVoidMethod(obj, m_id);
                     }
-                    jclass clazz = env->FindClass("io/weichao/util/MediaUtil");
-//                    jmethodID c_id = env->GetMethodID(clazz,"<init>", "()V");
-//                    jobject obj = env->NewObject(clazz,c_id);
-//                    jmethodID m_id = env->GetMethodID(clazz,"playMp3_1", "()V");
-//                    env->CallVoidMethod(obj, m_id);
-                    jmethodID m_id = env->GetStaticMethodID(clazz,"playMp3_1", "()V");
-                    env->CallStaticVoidMethod(clazz, m_id);
                 }
             }
             if (video) {
@@ -158,6 +201,22 @@ void HelloARVideo::render()
             video->onLost();
             tracked_target = 0;
         }
+        if (g_ctx.isPlaying) {
+            g_ctx.isPlaying = false;
+            int status;
+            JNIEnv *env = NULL;
+            status = g_ctx.javaVM->GetEnv((void **) &env, JNI_VERSION_1_6);
+            if (status < 0) {
+                status = g_ctx.javaVM->AttachCurrentThread(&env, NULL);
+                if (status < 0) {
+                    env = NULL;
+                }
+            }
+            jclass clazz = g_ctx.mainActivityClz;
+            jobject obj = g_ctx.mainActivityObj;
+            jmethodID m_id = env->GetMethodID(clazz, "stopMP3_1", "()V");
+            env->CallVoidMethod(obj, m_id);
+        }
     }
 }
 
@@ -177,9 +236,13 @@ bool HelloARVideo::clear()
 }
 EasyAR::samples::HelloARVideo ar;
 
-JNIEXPORT jboolean JNICALL JNIFUNCTION_NATIVE(nativeInit(JNIEnv* env, jobject))
+JNIEXPORT jboolean JNICALL JNIFUNCTION_NATIVE(nativeInit(JNIEnv* env, jobject instance))
 {
-    env->GetJavaVM(&g_javaVM);
+    jclass clz = env->GetObjectClass(instance);
+    g_ctx.mainActivityClz = (jclass)env->NewGlobalRef(clz);
+    g_ctx.mainActivityObj = env->NewGlobalRef(instance);
+    g_ctx.isPlaying = false;
+
     bool status = ar.initCamera();
     ar.loadAllFromJsonFile("targets.json");
     ar.loadFromImage("namecard.jpg");
@@ -187,9 +250,14 @@ JNIEXPORT jboolean JNICALL JNIFUNCTION_NATIVE(nativeInit(JNIEnv* env, jobject))
     return status;
 }
 
-JNIEXPORT void JNICALL JNIFUNCTION_NATIVE(nativeDestory(JNIEnv*, jobject))
+JNIEXPORT void JNICALL JNIFUNCTION_NATIVE(nativeDestory(JNIEnv* env, jobject))
 {
     ar.clear();
+
+    env->DeleteGlobalRef(g_ctx.mainActivityClz);
+    env->DeleteGlobalRef(g_ctx.mainActivityObj);
+    g_ctx.mainActivityObj = NULL;
+    g_ctx.mainActivityClz = NULL;
 }
 
 JNIEXPORT void JNICALL JNIFUNCTION_NATIVE(nativeInitGL(JNIEnv*, jobject))
